@@ -1,0 +1,122 @@
+// === Dual‑Sensor Reverse‑on‑Drift Line Follower ===
+// 2 digital IR sensors mounted inside the line bounds:
+//   HIGH = over black line, LOW = over white background
+// Behavior:
+//   • Both on line: drive straight at STRAIGHT_SPEED
+//   • Left sees white  : stop right wheel, reverse left wheel at REVERSE_SPEED
+//   • Right sees white : stop left wheel, reverse right wheel at REVERSE_SPEED
+//   • Both see white   : stop both motors
+
+// --- Motor Driver Pins ---
+const int ENA = 5;  // PWM for left motor
+const int IN1 = 7;  // Left motor dir pin 1
+const int IN2 = 6;  // Left motor dir pin 2
+const int ENB = 3;  // PWM for right motor
+const int IN3 = 4;  // Right motor dir pin 1
+const int IN4 = 2;  // Right motor dir pin 2
+
+// --- Sensor Pins ---
+const int rightSensorPin = 8;
+const int leftSensorPin  = 9;
+
+// --- Tunable Constants ---
+const float STRAIGHT_SPEED    = 0.4;   // forward speed (0.0–1.0)
+const float REVERSE_SPEED     = 0.4;   // reverse speed (0.0–1.0)
+const unsigned long STARTUP_DELAY_MS = 5000UL;  // ms to wait on power‑on/reset
+
+const int MAX_PWM = 255;
+
+// ——— Line‑lost reacquisition parameters ———
+const int  LOST_MAX_ITER    = 10;  // number of loops to keep turning before giving up
+int        lostCounter      = 0;   // counts iterations since line lost
+int        lastCorrection   = 0;   // –1 = turning left, +1 = turning right, 0 = straight
+
+
+void setup() {
+  Serial.begin(9600);
+
+  // configure motor pins
+  pinMode(ENA, OUTPUT);  pinMode(IN1, OUTPUT);  pinMode(IN2, OUTPUT);
+  pinMode(ENB, OUTPUT);  pinMode(IN3, OUTPUT);  pinMode(IN4, OUTPUT);
+
+  // configure sensors
+  pinMode(leftSensorPin, INPUT);
+  pinMode(rightSensorPin, INPUT);
+
+  Serial.println("Startup delay... place robot on track");
+  delay(STARTUP_DELAY_MS);
+}
+
+void loop() {
+  bool leftOnLine   = digitalRead(leftSensorPin);   // HIGH = black
+  bool rightOnLine  = digitalRead(rightSensorPin);  // HIGH = black
+
+  int straightPWM = int(STRAIGHT_SPEED * MAX_PWM);
+  int reversePWM  = int(REVERSE_SPEED  * MAX_PWM);
+
+  // 1) Line detected → normal behavior + reset counters
+  if (leftOnLine && rightOnLine) {
+    lostCounter    = 0;
+    lastCorrection = 0;
+    // drive straight
+    digitalWrite(IN1, HIGH);  digitalWrite(IN2, LOW);
+    digitalWrite(IN3, HIGH);  digitalWrite(IN4, LOW);
+    analogWrite(ENA, straightPWM);
+    analogWrite(ENB, straightPWM);
+  }
+  // 2) Left sensor sees white → pivot left
+  else if (!leftOnLine && rightOnLine) {
+    lostCounter    = 0;
+    lastCorrection = -1;
+    // stop left, reverse right
+    digitalWrite(IN1, LOW);   digitalWrite(IN2, LOW);
+    analogWrite(ENA, 0);
+    digitalWrite(IN3, LOW);   digitalWrite(IN4, HIGH);
+    analogWrite(ENB, reversePWM);
+  }
+  // 3) Right sensor sees white → pivot right
+  else if (!rightOnLine && leftOnLine) {
+    lostCounter    = 0;
+    lastCorrection = +1;
+    // stop right, reverse left
+    digitalWrite(IN3, LOW);   digitalWrite(IN4, LOW);
+    analogWrite(ENB, 0);
+    digitalWrite(IN1, LOW);   digitalWrite(IN2, HIGH);
+    analogWrite(ENA, reversePWM);
+  }
+  // 4) Both sensors white → line lost
+  else {
+    lostCounter++;
+    if (lostCounter <= LOST_MAX_ITER && lastCorrection != 0) {
+      // keep doing the _previous_ pivot
+      if (lastCorrection < 0) {
+        // continue pivot left
+        digitalWrite(IN1, LOW);   digitalWrite(IN2, LOW);
+        analogWrite(ENA, 0);
+        digitalWrite(IN3, LOW);   digitalWrite(IN4, HIGH);
+        analogWrite(ENB, reversePWM);
+      } else {
+        // continue pivot right
+        digitalWrite(IN3, LOW);   digitalWrite(IN4, LOW);
+        analogWrite(ENB, 0);
+        digitalWrite(IN1, LOW);   digitalWrite(IN2, HIGH);
+        analogWrite(ENA, reversePWM);
+      }
+    } else {
+      // give up → stop both
+      digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
+      digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
+      analogWrite(ENA, 0);
+      analogWrite(ENB, 0);
+    }
+  }
+
+  // debug (optional)
+  Serial.print("L="); Serial.print(leftOnLine);
+  Serial.print(" R="); Serial.print(rightOnLine);
+  Serial.print(" cnt="); Serial.print(lostCounter);
+  Serial.print(" dir="); Serial.println(lastCorrection);
+
+  delay(1);
+}
+

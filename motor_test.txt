@@ -1,0 +1,63 @@
+// Motor Driver Control Sketch
+// Spins left wheel forward, then right wheel forward, with a stop in between, in a loop.
+
+// Pin assignments
+const int ENA = 5;  // PWM enable pin for left motor
+const int IN1 = 7;  // Direction pin 1 for left motor
+const int IN2 = 6;  // Direction pin 2 for left motor
+const int IN3 = 4;  // Direction pin 1 for right motor
+const int IN4 = 2;  // Direction pin 2 for right motor
+const int ENB = 3;  // PWM enable pin for right motor
+
+// Duration for each action (in milliseconds)
+const unsigned long ACTION_DELAY = 1000;
+
+void setup() {
+  // Set all motor control pins as outputs
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(ENB, OUTPUT);
+
+  // Enable both motors at full speed
+  digitalWrite(ENA, HIGH);
+  digitalWrite(ENB, HIGH);
+}
+
+void loop() {
+  // 1) STOP: both motors off
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  delay(ACTION_DELAY);
+
+  // 2) LEFT WHEEL FORWARD only
+  // Left motor forward: IN1=HIGH, IN2=LOW
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  // Right motor stopped
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  delay(ACTION_DELAY);
+
+  // 3) RIGHT WHEEL FORWARD only
+  // Left motor stopped
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  // Right motor forward: IN3=HIGH, IN4=LOW
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+  delay(ACTION_DELAY);
+
+  // 4) Both backwards
+  // Left motor backwards: IN1=LOW, IN2=HIGH
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, HIGH);
+  // Right motor backwards: IN3=LOW, IN4=HIGH
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, HIGH);
+  delay(ACTION_DELAY);
+}

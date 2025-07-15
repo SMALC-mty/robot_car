@@ -1,0 +1,90 @@
+// Line‑Follower Self‑Correcting Drive Sketch
+// 10 s startup delay to place the car, then normal line‑following drive.
+
+const int ENA = 5;       // PWM pin for left motor
+const int IN1 = 7;       // Left motor direction pin 1
+const int IN2 = 6;       // Left motor direction pin 2
+const int ENB = 3;       // PWM pin for right motor
+const int IN3 = 4;       // Right motor direction pin 1
+const int IN4 = 2;       // Right motor direction pin 2
+
+const int rightSensorPin = 8; // Digital pin: right line sensor (1 = black)
+const int leftSensorPin  = 9; // Digital pin: left line sensor  (1 = black)
+
+// Tunable parameters
+const float FORWARD_SPEED    = 0.35;   // Base forward speed (0.0–1.0)
+const float CORRECTION_SPEED = 0.0;   // Wheel speed when correcting (0.0–1.0)
+const unsigned long STARTUP_DELAY_MS = 5000UL; // ms to wait at startup
+
+const int MAX_PWM = 255; // Max PWM value for analogWrite()
+
+void setup() {
+  Serial.begin(9600);
+
+  // 1) Configure all pins
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(rightSensorPin, INPUT);
+  pinMode(leftSensorPin,  INPUT);
+
+  // 2) Ensure motors are stopped
+  //    BOTH direction pins low → brake/coast, AND zero PWM
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+
+  // 3) Startup delay: time to set the car on the ground
+  Serial.print("Startup delay: ");
+  Serial.print(STARTUP_DELAY_MS / 1000);
+  Serial.println("s — place the car now.");
+  delay(STARTUP_DELAY_MS);
+
+  // 4) After delay, set forward direction for both motors
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+
+  Serial.println("Starting line-following drive.");
+}
+
+void loop() {
+  // Read sensors (HIGH when over black line)
+  bool rightOnLine = digitalRead(rightSensorPin);
+  bool leftOnLine  = digitalRead(leftSensorPin);
+
+  // Calculate speeds
+  int baseSpeed       = int(FORWARD_SPEED * MAX_PWM);
+  int correctionSpeed = int(CORRECTION_SPEED * MAX_PWM);
+  int leftSpeed  = baseSpeed;
+  int rightSpeed = baseSpeed;
+
+  // Steering correction
+  if ( rightOnLine && !leftOnLine) {
+    // veered right → slow right wheel
+    rightSpeed = correctionSpeed;
+  }
+  else if ( leftOnLine && !rightOnLine) {
+    // veered left → slow left wheel
+    leftSpeed = correctionSpeed;
+  }
+
+  // Apply speeds
+  analogWrite(ENA, leftSpeed);
+  analogWrite(ENB, rightSpeed);
+
+  // Debug output (optional)
+  //Serial.print("Rsen="); Serial.print(rightOnLine);
+  //Serial.print(" Lsen="); Serial.print(leftOnLine);
+  //Serial.print(" | Lsp="); Serial.print(leftSpeed);
+  //Serial.print(" Rsp="); Serial.println(rightSpeed);
+
+  //delay(5);
+}

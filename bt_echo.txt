@@ -1,0 +1,28 @@
+#include <Arduino.h>
+#include <SoftwareSerial.h>
+
+// --- PIN DEFINITIONS ---
+SoftwareSerial BTSerial(10, 11); // RX, TX
+
+void setup() {
+  Serial.begin(9600);
+  BTSerial.begin(9600);
+  Serial.println("Echo program started");
+  BTSerial.println("Echo program started");
+}
+
+void loop() {
+  // Echo from Serial to BTSerial
+  if (Serial.available()) {
+    char c = Serial.read();
+    BTSerial.write(c);
+    Serial.write(c); // Optional: echo back to Serial too
+  }
+
+  // Echo from BTSerial to Serial
+  if (BTSerial.available()) {
+    char c = BTSerial.read();
+    Serial.write(c);
+    BTSerial.write(c); // Optional: echo back to BTSerial too
+  }
+}

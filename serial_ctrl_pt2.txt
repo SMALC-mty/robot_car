@@ -1,0 +1,85 @@
+#include <Arduino.h>
+#include <SoftwareSerial.h>
+
+// --- PIN DEFINITIONS ---
+SoftwareSerial BTSerial(10, 11); // RX, TX
+const int ENA = 5;  // PWM enable pin for left motor
+const int IN1 = 7;  // Direction pin 1 for left motor
+const int IN2 = 6;  // Direction pin 2 for left motor
+const int IN3 = 4;  // Direction pin 1 for right motor
+const int IN4 = 2;  // Direction pin 2 for right motor
+const int ENB = 3;  // PWM enable pin for right motor
+
+
+void setup() {
+  Serial.begin(9600);
+  BTSerial.begin(9600);
+  
+  // Configure motor pins as outputs
+  pinMode(ENA, OUTPUT);
+  pinMode(IN1, OUTPUT);
+  pinMode(IN2, OUTPUT);
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(ENB, OUTPUT);
+  
+  // Set motor speeds once
+  analogWrite(ENA, 255);  // Full speed for left motor
+  analogWrite(ENB, 255);  // Full speed for right motor
+  
+  // Start with motors stopped
+  stopMotors();
+  
+  println("Robot car ready. Send 'F' for forward, 'S' for stop.");
+}
+
+void loop() {
+  if (available()) {
+    char command = read();
+    
+    if (command == 'F') {
+      moveForward();
+      println("Moving forward");
+    }
+    else if (command == 'S') {
+      stopMotors();
+      println("Stopped");
+    }
+    else if (command >= '0' && command <= '9') {
+      updateSpeed(command);
+    }
+    else {
+      print("Unknown command: ");
+      println(String(command));
+    }
+  }
+}
+
+void moveForward() {
+  // Set both motors to forward direction
+  digitalWrite(IN1, HIGH);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, HIGH);
+  digitalWrite(IN4, LOW);
+}
+
+void stopMotors() {
+  // Stop both motors by setting direction pins low
+  digitalWrite(IN1, LOW);
+  digitalWrite(IN2, LOW);
+  digitalWrite(IN3, LOW);
+  digitalWrite(IN4, LOW);
+}
+
+void updateSpeed(char speedChar) {
+  int digit = speedChar - '0';  // Convert char to int
+  float speedMultiplier = (digit + 1) / 10.0;  // 0->0.1, 1->0.2, ..., 9->1.0
+  int speedValue = (int)(255 * speedMultiplier);
+  
+  analogWrite(ENA, speedValue);
+  analogWrite(ENB, speedValue);
+  
+  print("Speed set to ");
+  print(String((int)(speedMultiplier * 100)));
+  println("%");
+}

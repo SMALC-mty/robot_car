@@ -1,0 +1,27 @@
+// Line Follower Dual‑Sensor Test Sketch
+// Reads two digital sensors: D8 = right, D9 = left.
+// Sensor outputs HIGH (1) when over the black line.
+
+const int rightPin = 8;  // Digital output from right sensor
+const int leftPin  = 9;  // Digital output from left sensor
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(rightPin, INPUT);
+  pinMode(leftPin,  INPUT);
+  // Optional: give sensors time to stabilize
+  delay(100);
+}
+
+void loop() {
+  int rVal = digitalRead(rightPin);
+  int lVal = digitalRead(leftPin);
+
+  // Print concise status: LINE when 1 (black), CLEAR when 0 (no line)
+  Serial.print("Right: ");
+  Serial.print(rVal ? "LINE (1)" : "CLEAR (0)");
+  Serial.print("   Left:  ");
+  Serial.println(lVal ? "LINE (1)" : "CLEAR (0)");
+
+  delay(200);
+}
