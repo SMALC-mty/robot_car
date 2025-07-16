@@ -2,7 +2,7 @@ import os
 import math
 import time
 import serial
-from input_manager.input_man import is_pressed, get_axis
+from input_manager.input_man import is_pressed, get_axis, rising_edge
 
 def get_robot_command(throttle, steering):
     """Convert throttle/steering values to robot command characters"""
@@ -29,7 +29,7 @@ def get_robot_command(throttle, steering):
     # Return direction + throttle speed + steering speed
     return direction + throttle_speed_char + steering_speed_char
 
-def user_input():
+def ctrl_input():
     # Separate slow/fast multipliers for throttle and steering
     slow_thr = 0.4
     fast_thr = 1.0
@@ -61,6 +61,14 @@ def user_input():
 
     return thr, st
 
+def mode_input():
+    """Check for mode selection keys 1-0, return mode letter a-j or None"""
+    mode_keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+    for i, key in enumerate(mode_keys):
+        if rising_edge(key):
+            return chr(ord('a') + i)  # 1->a, 2->b, ..., 0->j
+    return None
+
 # Initialize Bluetooth serial connection
 try:
     bt_serial = serial.Serial('COM8', 9600, timeout=1)
@@ -76,14 +84,21 @@ pr = is_pressed
 try:
     prev_command = None
     last_send_time = 0
-    send_interval = 0.25  # Fixed interval for sending commands
+    send_interval = 0.1  # Fixed interval for sending commands
     
     while True:
         current_time = time.time()
         time_elapsed = (current_time - last_send_time) >= send_interval
         
-        if time_elapsed:
-            thr, st = user_input()
+        # Check for mode input first (always check, regardless of interval)
+        mode = mode_input()
+        if mode:
+            bt_serial.write(mode.encode())
+            print(f"Mode switch: {mode}")
+            last_send_time = current_time
+        elif time_elapsed:
+            # Regular movement commands (only when interval elapsed)
+            thr, st = ctrl_input()
             command = get_robot_command(thr, st)
             
             # Only send if command actually changed (smart change detection)
