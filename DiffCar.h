@@ -25,7 +25,7 @@ public:
     _left  = 0.0f;
     _right = 0.0f;
     // initialize trim (0 = no adjustment)
-    _trim = -0.1f;
+    _trim = -0.05f;
     // configure pins
     pinMode(_ENA, OUTPUT);
     pinMode(_IN1, OUTPUT);

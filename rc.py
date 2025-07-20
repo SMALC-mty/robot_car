@@ -92,11 +92,11 @@ def trim_input():
 
 # Initialize Bluetooth serial connection
 try:
-    bt_serial = serial.Serial('COM8', 9600, timeout=1)
-    print("Connected to robot car on COM8")
+    bt_serial = serial.Serial('COM7', 9600, timeout=1)
+    print("Connected to robot car on COM7")
     time.sleep(2)  # Give Arduino time to initialize
 except serial.SerialException as e:
-    print(f"Failed to connect to COM8: {e}")
+    print(f"Failed to connect to COM7: {e}")
     exit()
 
 

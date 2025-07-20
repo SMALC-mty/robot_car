@@ -54,6 +54,16 @@ void loop() {
   else if (currentMode == 'c') {
     followLine(); // Line following mode
   }
+  else if (currentMode == 'd') {
+    followLineV2(); // Alternative line following mode
+  }
+  else if (currentMode == 'e') {
+    wanderCage(); // Cage wandering mode
+  }
+  else {
+    Serial.println("Unknown mode. Defaulting to remote control.");
+    currentMode = 'a'; // Fallback to remote control
+  }
 }
 
 void receiveChar() {
@@ -209,4 +219,95 @@ void followLine() {
     }
   }
   delay(1);
+}
+
+void followLineV2() {
+  // Constant settings
+  const unsigned long LOST_TIMEOUT_MS = 500;  // timeout for permanent line loss
+  const float BASE_THROTTLE = 1.0;
+  const float BASE_STEERING = 1.0;
+  const float ALIGN_THRESHOLD = 0.0;  // Below this, robot will reverse
+
+  // Static variables for error-based line following state
+  static unsigned long lineLastSeen = 0;        // timestamp when line was last detected
+  static float lastDirection = 0.0;         // remember last correction direction
+  
+  // Read sensor states (HIGH = black line, LOW = white background)
+  int leftSensor = digitalRead(leftSensorPin);   // 0 or 1
+  int rightSensor = digitalRead(rightSensorPin); // 0 or 1
+  
+  // Determine error based on sensor states
+  float error = 0.0;
+  if (leftSensor || rightSensor) { // Check if at least one sensor is on the line
+    lastDirection = -leftSensor + rightSensor;  // Remember this direction
+    error = lastDirection * 0.5; // Scale error to -0.5 to +0.5 range
+    lineLastSeen = millis();      // Update timestamp when line is detected
+  }
+  else { // Both sensors off line - handle line loss case
+    error = lastDirection; // Use last known direction
+  }
+  
+  // Initialize motor commands
+  float throttle = 0.0;
+  float steering = 0.0;
+  
+  // Check if timeout has been exceeded
+  if (millis() - lineLastSeen <= LOST_TIMEOUT_MS) {
+    // Determine alignment (1 - absolute value of error)
+    float alignment = 1.0 - abs(error);
+    
+    // Calculate throttle factor using alignment threshold
+    float throttle_factor = (alignment - ALIGN_THRESHOLD) / (1.0 - ALIGN_THRESHOLD);
+    
+    // Calculate throttle and steering based on alignment and error
+    throttle = BASE_THROTTLE * throttle_factor;  // Can go negative for reverse
+    steering = BASE_STEERING * error;            // Steer proportionally to error
+  }
+  
+  // Apply motor commands
+  car.setThrottle(throttle);
+  car.setSteering(steering);
+
+  Serial.print("Error: "); Serial.print(error);
+  Serial.print(", T: "); Serial.print(throttle);
+  Serial.print(", S: "); Serial.println(steering);
+}
+
+void wanderCage() {
+  // Constant settings
+  const float THROTTLE = 1.0;
+  const float STEERING = 1.0;
+  const unsigned long SPIN_TIME_MS = 1000;
+  
+  // Static variables for cage wandering state
+  static unsigned long spinStartTime = 0;
+  static int spinDirection = 0;  // -1 = right, +1 = left
+  
+  // Read sensor states (HIGH = black line/boundary, LOW = white interior)
+  bool leftSensor = digitalRead(leftSensorPin);
+  bool rightSensor = digitalRead(rightSensorPin);
+  
+  // Check if we hit a boundary
+  if (leftSensor || rightSensor) {
+    // Hit boundary - start spinning away from it
+    spinStartTime = millis();
+    
+    if (leftSensor && !rightSensor) {
+      spinDirection = -1;  // Left sensor hit - spin right (away from boundary)
+    } else {
+      // Right sensor hit OR both sensors hit - spin left (away from boundary)
+      spinDirection = 1;
+    }
+  }
+  
+  // Check if we're still within spin timeout
+  if (millis() - spinStartTime < SPIN_TIME_MS) {
+    // Continue spinning in the chosen direction
+    car.setThrottle(0.0);
+    car.setSteering(STEERING * spinDirection);
+  } else {
+    // Spin timeout elapsed or no boundary - go straight ahead
+    car.setThrottle(THROTTLE);
+    car.setSteering(0.0);
+  }
 }
