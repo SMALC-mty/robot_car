@@ -25,13 +25,6 @@ float steerSpeed = 0.5;  // Steering speed multiplier: 0.0 to 1.0
 char receivedChar = 0;   // Current received character (0 = null/none)
 char currentMode = 'a';  // Current mode: 'a' = remote control, 'b' = dance, etc.
 
-// --- LINE FOLLOWING STATE VARIABLES ---
-int lostCounter = 0;       // counts iterations since line lost
-int lastCorrection = 0;    // -1 = turning left, +1 = turning right, 0 = straight
-const int LOST_MAX_ITER = 10;  // number of loops to keep turning before giving up
-const float LINE_STRAIGHT_SPEED = 0.4;   // forward speed for line following
-const float LINE_REVERSE_SPEED = 0.4;    // reverse speed for corrections
-
 void setup() {
   Serial.begin(9600);
   BTSerial.begin(9600);
@@ -49,6 +42,7 @@ void loop() {
   receiveModeSwitch();  // Check for mode changes first
   receiveDirection();
   receiveSpeed();
+  receiveTrimAdjust();  // Check for trim adjustments
   
   // Execute current mode behavior
   if (currentMode == 'a') {
@@ -113,6 +107,25 @@ void receiveSpeed() {
   // If not 0-9 or !-*, speeds remain unchanged
 }
 
+void receiveModeSwitch() {
+  if (receivedChar >= 'a' && receivedChar <= 'j') {  // Limit to a-j for modes
+    currentMode = receivedChar;
+    Serial.print("Mode switched to: ");
+    Serial.println(currentMode);
+  }
+}
+
+void receiveTrimAdjust() {
+  if (receivedChar >= 'k' && receivedChar <= '~') {
+    // Map k-~ (107-126) to -9 to +9, with 's' (115) as center (0)
+    int trimStep = receivedChar - 's';  // 's' becomes 0
+    float trim_factor = 0.2f;
+    float trimValue = trimStep * 0.1 * trim_factor;
+    car.setTrim(trimValue);
+    Serial.print("Trim: "); Serial.println(trimValue);
+  }
+}
+
 void updateCar() {
   float finalThrottle = throttle * speed;                // Combine direction and magnitude
   float finalSteering = steering * steerSpeed;           // Combine steering direction and steering speed
@@ -134,22 +147,21 @@ void dance() {
   delay(500);
 }
 
-void receiveModeSwitch() {
-  if (receivedChar >= 'a' && receivedChar <= 'z') {
-    currentMode = receivedChar;
-    Serial.print("Mode switched to: ");
-    Serial.println(currentMode);
-  }
-}
-
 void followLine() {
+  // Static variables for line following state (encapsulated within function)
+  static unsigned long lineLostTime = 0;    // timestamp when line was lost (millis)
+  static int lastCorrection = 0;            // -1 = turning left, +1 = turning right, 0 = straight
+  static const unsigned long LOST_TIMEOUT_MS = 500;  // milliseconds to keep searching before giving up
+  static const float LINE_STRAIGHT_SPEED = 0.4;      // forward speed for line following
+  static const float LINE_REVERSE_SPEED = 0.4;       // reverse speed for corrections
+  
   // Read sensor states (HIGH = black line, LOW = white background)
   bool leftOnLine = digitalRead(leftSensorPin);
   bool rightOnLine = digitalRead(rightSensorPin);
   
-  // 1) Both sensors on line → drive straight + reset counters
+  // 1) Both sensors on line → drive straight + reset timer
   if (leftOnLine && rightOnLine) {
-    lostCounter = 0;
+    lineLostTime = 0;  // Reset lost timer
     lastCorrection = 0;
     // Drive straight - both wheels forward at same speed
     car.setLeft(LINE_STRAIGHT_SPEED);
@@ -157,7 +169,7 @@ void followLine() {
   }
   // 2) Left sensor sees white → pivot left (stop right wheel, reverse left)
   else if (!leftOnLine && rightOnLine) {
-    lostCounter = 0;
+    lineLostTime = 0;  // Reset lost timer (line partially detected)
     lastCorrection = -1;
     // Stop right wheel, reverse left wheel
     car.setLeft(-LINE_REVERSE_SPEED);  // Reverse left
@@ -165,7 +177,7 @@ void followLine() {
   }
   // 3) Right sensor sees white → pivot right (stop left wheel, reverse right)
   else if (!rightOnLine && leftOnLine) {
-    lostCounter = 0;
+    lineLostTime = 0;  // Reset lost timer (line partially detected)
     lastCorrection = 1;
     // Stop left wheel, reverse right wheel
     car.setLeft(0.0);                  // Stop left
@@ -173,8 +185,14 @@ void followLine() {
   }
   // 4) Both sensors see white → line lost, try to reacquire
   else {
-    lostCounter++;
-    if (lostCounter <= LOST_MAX_ITER && lastCorrection != 0) {
+    // Start timing if we just lost the line
+    if (lineLostTime == 0) {
+      lineLostTime = millis();
+    }
+    
+    unsigned long elapsedTime = millis() - lineLostTime;
+    
+    if (elapsedTime < LOST_TIMEOUT_MS && lastCorrection != 0) {
       // Continue the previous correction direction
       if (lastCorrection < 0) {
         // Continue pivot left
@@ -186,9 +204,8 @@ void followLine() {
         car.setRight(-LINE_REVERSE_SPEED);
       }
     } else {
-      // Give up → stop both wheels
-      car.setLeft(0.0);
-      car.setRight(0.0);
+      // Give up → stop
+      car.stop();
     }
   }
   delay(1);

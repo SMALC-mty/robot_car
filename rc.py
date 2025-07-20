@@ -63,10 +63,31 @@ def ctrl_input():
 
 def mode_input():
     """Check for mode selection keys 1-0, return mode letter a-j or None"""
+    if is_pressed('t'):
+        # If 't' is pressed, return None to indicate no mode change
+        return None
     mode_keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+    
     for i, key in enumerate(mode_keys):
         if rising_edge(key):
             return chr(ord('a') + i)  # 1->a, 2->b, ..., 0->j
+    
+    return None
+
+def trim_input():
+    """Check for trim adjustment keys t+1-9, return trim character k-~ or None"""
+    if not is_pressed('t'):
+        return None
+        
+    trim_keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+    
+    for i, key in enumerate(trim_keys):
+        if rising_edge(key):
+            # Map 1-9 to -8 to +8, with 5 as center (0)
+            trim_step = (i - 4) * 2  # 1->-8, 2->-6, ..., 5->0, ..., 9->+8
+            trim_char = chr(ord('s') + trim_step)  # 's' + offset
+            return trim_char
+    
     return None
 
 # Initialize Bluetooth serial connection
@@ -92,9 +113,17 @@ try:
         
         # Check for mode input first (always check, regardless of interval)
         mode = mode_input()
+        trim = trim_input()
+        
         if mode:
             bt_serial.write(mode.encode())
             print(f"Mode switch: {mode}")
+            last_send_time = current_time
+        elif trim:
+            bt_serial.write(trim.encode())
+            # Calculate trim integer for display
+            trim_step = ord(trim) - ord('s')
+            print(f"Trim set: {trim_step:+d}")
             last_send_time = current_time
         elif time_elapsed:
             # Regular movement commands (only when interval elapsed)

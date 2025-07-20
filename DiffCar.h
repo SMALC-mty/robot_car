@@ -24,6 +24,8 @@ public:
     // initialize raw wheel speeds
     _left  = 0.0f;
     _right = 0.0f;
+    // initialize trim (0 = no adjustment)
+    _trim = -0.1f;
     // configure pins
     pinMode(_ENA, OUTPUT);
     pinMode(_IN1, OUTPUT);
@@ -69,14 +71,33 @@ public:
     return s;
   }
 
+  // — Convenience method to stop both wheels
+  void stop() {
+    _left = 0.0f;
+    _right = 0.0f;
+    _applyLR();
+  }
+
+  // — Trim property (motor speed compensation)
+  void  setTrim(float trim) {
+    _trim = constrain(trim, -1.0f, 1.0f);
+    _applyLR();  // Re-apply with new trim
+  }
+  float getTrim() const { return _trim; }
+
 private:
   uint8_t _ENA, _IN1, _IN2, _ENB, _IN3, _IN4;
   float   _left, _right;
+  float   _trim;  // Motor speed compensation: -1.0 (slow left) to +1.0 (slow right)
 
   // apply _left/_right to the hardware, clamping only at write time
   void _applyLR() {
-    _driveMotor(_ENA, _IN1, _IN2, _left);
-    _driveMotor(_ENB, _IN3, _IN4, _right);
+    // Apply trim compensation before sending to motors
+    float leftAdjusted = _left * (_trim < 0 ? (1.0f + _trim) : 1.0f);
+    float rightAdjusted = _right * (_trim > 0 ? (1.0f - _trim) : 1.0f);
+    
+    _driveMotor(_ENA, _IN1, _IN2, leftAdjusted);
+    _driveMotor(_ENB, _IN3, _IN4, rightAdjusted);
   }
 
   // drive one motor: clamp v∈[-1,1] here, then map to PWM
