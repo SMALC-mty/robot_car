@@ -2,12 +2,14 @@
 // These functions automatically send output to both USB Serial and Bluetooth Serial
 // and read input from whichever source has data available
 
-void println(const String& msg) {
+template<typename T>
+void println(const T& msg) {
   Serial.println(msg);
   BTSerial.println(msg);
 }
 
-void print(const String& msg) {
+template<typename T>
+void print(const T& msg) {
   Serial.print(msg);
   BTSerial.print(msg);
 }

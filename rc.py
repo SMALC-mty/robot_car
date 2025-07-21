@@ -1,45 +1,18 @@
-import os
-import math
 import time
-import serial
 from input_manager.input_man import is_pressed, get_axis, rising_edge
-
-def get_robot_command(throttle, steering):
-    """Convert throttle/steering values to robot command characters"""
-    # Get the direction command
-    if throttle > 0 and steering == 0:      direction = 'F'  # Forward
-    elif throttle < 0 and steering == 0:    direction = 'B'  # Backward  
-    elif throttle == 0 and steering > 0:    direction = 'L'  # Rotate Left
-    elif throttle == 0 and steering < 0:    direction = 'R'  # Rotate Right
-    elif throttle > 0 and steering > 0:     direction = 'G'  # Forward + Left
-    elif throttle > 0 and steering < 0:     direction = 'H'  # Forward + Right
-    elif throttle < 0 and steering > 0:     direction = 'I'  # Backward + Left
-    elif throttle < 0 and steering < 0:     direction = 'J'  # Backward + Right
-    elif throttle == 0 and steering == 0:   direction = 'S'  # Stop
-    else: return None
-    
-    # Convert throttle magnitude to speed digit (0-9)
-    throttle_digit = min(9, int(abs(throttle) * 10))
-    throttle_speed_char = str(throttle_digit)
-    
-    # Convert steering magnitude to steering speed symbol (!"#$%&'()*)
-    steering_digit = min(9, int(abs(steering) * 10))
-    steering_speed_char = chr(ord('!') + steering_digit)  # ! + offset
-    
-    # Return direction + throttle speed + steering speed
-    return direction + throttle_speed_char + steering_speed_char
+from robot_car import RobotCar
 
 def ctrl_input():
     # Separate slow/fast multipliers for throttle and steering
-    slow_thr = 0.4
+    slow_thr = 0.5
     fast_thr = 1.0
-    slow_st = 0.3
+    slow_st = 0.4
     fast_st = 0.8
 
     # Get keyboard input
-    key_thr = 1 if pr("w") else -1 if pr("s") else 0
-    key_st = 1 if pr("a") else -1 if pr("d") else 0
-    key_boost = 1 if pr("c") else 0
+    key_thr = 1 if is_pressed("w") else -1 if is_pressed("s") else 0
+    key_st = 1 if is_pressed("a") else -1 if is_pressed("d") else 0
+    key_boost = 1 if is_pressed("c") else 0
 
     # Get controller input
     joy_thr = get_axis('LY')
@@ -62,87 +35,57 @@ def ctrl_input():
     return thr, st
 
 def mode_input():
-    """Check for mode selection keys 1-0, return mode letter a-j or None"""
-    if is_pressed('t'):
-        # If 't' is pressed, return None to indicate no mode change
-        return None
+    """Check for mode selection keys 1-0 or gamepad buttons, return mode number 0-9 or None"""
     mode_keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0']
+    mode_btns = ["A", "B", "X"]
     
+    # Check keyboard keys 1-0
     for i, key in enumerate(mode_keys):
         if rising_edge(key):
-            return chr(ord('a') + i)  # 1->a, 2->b, ..., 0->j
+            return i  # 1->0, 2->1, ..., 0->9
+    
+    # Check gamepad buttons for first few modes
+    for i, btn in enumerate(mode_btns):
+        if rising_edge(btn):
+            return i  # A->0, B->1, X->2
     
     return None
 
 def trim_input():
-    """Check for trim adjustment keys t+1-9, return trim character k-~ or None"""
-    if not is_pressed('t'):
-        return None
-        
-    trim_keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9']
+    """Check for trim adjustment arrow keys, return trim value -9 to +9 or None"""
+    # Initialize trim state if it doesn't exist (function attribute as static variable)
+    if not hasattr(trim_input, 'current_trim'):
+        trim_input.current_trim = 0
     
-    for i, key in enumerate(trim_keys):
-        if rising_edge(key):
-            # Map 1-9 to -8 to +8, with 5 as center (0)
-            trim_step = (i - 4) * 2  # 1->-8, 2->-6, ..., 5->0, ..., 9->+8
-            trim_char = chr(ord('s') + trim_step)  # 's' + offset
-            return trim_char
+    # Check for arrow key presses
+    if rising_edge("Key.right","DPAD_RIGHT"):
+        trim_input.current_trim = min(9, trim_input.current_trim + 1)
+        return trim_input.current_trim
+    elif rising_edge("Key.left","DPAD_LEFT"):
+        trim_input.current_trim = max(-9, trim_input.current_trim - 1)
+        return trim_input.current_trim
     
     return None
 
-# Initialize Bluetooth serial connection
-try:
-    bt_serial = serial.Serial('COM7', 9600, timeout=1)
-    print("Connected to robot car on COM7")
-    time.sleep(2)  # Give Arduino time to initialize
-except serial.SerialException as e:
-    print(f"Failed to connect to COM7: {e}")
-    exit()
-
-
-
-pr = is_pressed
-try:
-    prev_command = None
-    last_send_time = 0
-    send_interval = 0.1  # Fixed interval for sending commands
-    
-    while True:
-        current_time = time.time()
-        time_elapsed = (current_time - last_send_time) >= send_interval
-        
-        # Check for mode input first (always check, regardless of interval)
-        mode = mode_input()
-        trim = trim_input()
-        
-        if mode:
-            bt_serial.write(mode.encode())
-            print(f"Mode switch: {mode}")
-            last_send_time = current_time
-        elif trim:
-            bt_serial.write(trim.encode())
-            # Calculate trim integer for display
-            trim_step = ord(trim) - ord('s')
-            print(f"Trim set: {trim_step:+d}")
-            last_send_time = current_time
-        elif time_elapsed:
-            # Regular movement commands (only when interval elapsed)
-            thr, st = ctrl_input()
-            command = get_robot_command(thr, st)
+# Main control loop
+with RobotCar(on_message=lambda msg: print(msg)) as car:
+    try:
+        while True:
+            # Check for mode input
+            mode = mode_input()
+            if mode is not None:
+                car.set_mode(mode)
             
-            # Only send if command actually changed (smart change detection)
-            if command and command != prev_command:
-                bt_serial.write(command.encode())
-                print(f"Sent: {command} (thr={thr:.1f}, st={st:.1f})")
-                prev_command = command
-                last_send_time = current_time
-        
-        time.sleep(0.02)  # High frequency input polling for automatic retry
-        
-except KeyboardInterrupt:
-    print("\nExiting...")
-finally:
-    if 'bt_serial' in locals():
-        bt_serial.write(b'S')  # Stop the robot
-        bt_serial.close()
-        print("Disconnected from robot car")
+            # Check for trim input
+            trim = trim_input()
+            if trim is not None:
+                car.set_trim(trim)
+            
+            # Regular movement commands
+            thr, st = ctrl_input()
+            car.move(thr, st)
+            
+            time.sleep(0.02)  # High frequency input polling
+            
+    except KeyboardInterrupt:
+        print("\nExiting...")
