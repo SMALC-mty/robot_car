@@ -3,20 +3,20 @@
 #include "DiffCar.h"
 
 // --- PIN DEFINITIONS ---
-SoftwareSerial BTSerial(10, 11); // RX, TX
+SoftwareSerial BTSerial(2, 3); // RX, TX
 DiffCar car(
-  5,  // ENA
-  7,  // IN1
-  6,  // IN2
-  3,  // ENB
-  4,  // IN3
-  2,  // IN4
-  0.18f // Trim factor (default = 0.18f, adjust as needed)
+  11, // ENA (Timer 2)
+  12, // IN1
+  10, // IN2
+  9,  // ENB (Timer 1)
+  8,  // IN3
+  7,  // IN4
+  0.05f // Trim factor (default = 0.18f, adjust as needed)
 );
 
 // --- SENSOR PIN DEFINITIONS ---
-const int leftSensorPin = 8;   // Left IR sensor
-const int rightSensorPin = 9;  // Right IR sensor
+const int leftSensorPin = 4;   // Left IR sensor
+const int rightSensorPin = 5;  // Right IR sensor
 
 // --- MODE DEFINITIONS ---
 void (*modeFunctions[4])() = { nullptr, nullptr, nullptr, nullptr };
@@ -43,6 +43,10 @@ void setup() {
   Serial.begin(9600);
   BTSerial.begin(9600);
   
+  // Configure PWM frequencies for better low-speed control (31Hz)
+  TCCR1B = (TCCR1B & 0xF8) | 0x05; // Prescaler 1024
+  TCCR2B = (TCCR2B & 0xF8) | 0x07; // Prescaler 1024
+  
   // Configure sensor pins for line following
   pinMode(leftSensorPin, INPUT);
   pinMode(rightSensorPin, INPUT);
@@ -53,7 +57,7 @@ void setup() {
   modeFunctions[2] = followLine;    // Line following
   modeFunctions[3] = wanderCage;    // Cage wandering
   
-  println("Robot car ready. Send 'F' for forward, 'S' for stop, '0'-'9' for speed.");
+  println("Robot car ready. PWM freq 31Hz. Send 'F' for forward, 'S' for stop, '0'-'9' for speed.");
 }
 
 void loop() {
@@ -165,8 +169,8 @@ void dance() {
 void followLine() {
   // Constant settings
   const unsigned long LOST_TIMEOUT_MS = 500;  // timeout for permanent line loss
-  const float BASE_THROTTLE = 1.0;
-  const float BASE_STEERING = 1.0;
+  const float BASE_THROTTLE = 0.6;
+  const float BASE_STEERING = 0.3;
   const float ALIGN_THRESHOLD = 0.0;  // Below this, robot will reverse
 
   // Static variables for error-based line following state

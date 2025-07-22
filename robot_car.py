@@ -43,7 +43,6 @@ class RobotCar:
         try:
             self.serial = serial.Serial(self.port, self.baud_rate, timeout=self.timeout)
             print(f"Connected to robot car on {self.port}")
-            time.sleep(2)  # Give Arduino time to reset
             self._start_reading()
         except serial.SerialException as e:
             print(f"Failed to connect to {self.port}: {e}")
@@ -259,7 +258,7 @@ class RobotCar:
 # Example usage
 if __name__ == '__main__':
     def handle_robot_message(message):
-        print(f"Robot: {message}")
+        print(message)
     
     car = RobotCar(on_message=handle_robot_message)
     pass # Start a REPL session here

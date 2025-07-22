@@ -3,10 +3,20 @@ from input_manager.input_man import is_pressed, get_axis, rising_edge
 from robot_car import RobotCar
 
 def ctrl_input():
-    # Separate slow/fast multipliers for throttle and steering
-    slow_thr = 0.5
+    # Dynamic base_thr adjustment with up/down arrows
+    ctrl_input.base_thr = getattr(ctrl_input, 'base_thr', 0.5)
+    
+    if rising_edge("Key.up","DPAD_UP"):
+        ctrl_input.base_thr = min(1.0, ctrl_input.base_thr + 0.1)
+        print(f"Base throttle: {ctrl_input.base_thr:.1f}")
+    elif rising_edge("Key.down","DPAD_DOWN"):
+        ctrl_input.base_thr = max(0.1, ctrl_input.base_thr - 0.1)
+        print(f"Base throttle: {ctrl_input.base_thr:.1f}")
+    
+    # Separate base/fast multipliers for throttle and steering
+    base_thr = ctrl_input.base_thr
     fast_thr = 1.0
-    slow_st = 0.4
+    base_st = 0.4
     fast_st = 0.8
 
     # Get keyboard input
@@ -25,8 +35,8 @@ def ctrl_input():
     boost = max(con_boost, key_boost)
 
     # Interpolate throttle and steering speeds separately
-    thr_speed = slow_thr + (fast_thr - slow_thr) * boost
-    st_speed = slow_st + (fast_st - slow_st) * boost
+    thr_speed = base_thr + (fast_thr - base_thr) * boost
+    st_speed = base_st + (fast_st - base_st) * boost
 
     # Apply speed scaling
     thr *= thr_speed
@@ -53,9 +63,7 @@ def mode_input():
 
 def trim_input():
     """Check for trim adjustment arrow keys, return trim value -9 to +9 or None"""
-    # Initialize trim state if it doesn't exist (function attribute as static variable)
-    if not hasattr(trim_input, 'current_trim'):
-        trim_input.current_trim = 0
+    trim_input.current_trim = getattr(trim_input, 'current_trim', 0)
     
     # Check for arrow key presses
     if rising_edge("Key.right","DPAD_RIGHT"):
