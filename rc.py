@@ -13,11 +13,11 @@ def ctrl_input():
         ctrl_input.base_thr = max(0.1, ctrl_input.base_thr - 0.1)
         print(f"Base throttle: {ctrl_input.base_thr:.1f}")
     
-    # Separate base/fast multipliers for throttle and steering
+    # Throttle scaling and steering ratio
     base_thr = ctrl_input.base_thr
     fast_thr = 1.0
-    base_st = 0.4
-    fast_st = 0.8
+    str_ratio = 0.8  # Steering speed as ratio of throttle speed
+    min_steering = 0.1  # Minimum steering speed to overcome static friction
 
     # Get keyboard input
     key_thr = 1 if is_pressed("w") else -1 if is_pressed("s") else 0
@@ -34,9 +34,9 @@ def ctrl_input():
     st = key_st if abs(key_st) > abs(joy_st) else joy_st
     boost = max(con_boost, key_boost)
 
-    # Interpolate throttle and steering speeds separately
+    # Calculate throttle speed and derive steering speed from ratio
     thr_speed = base_thr + (fast_thr - base_thr) * boost
-    st_speed = base_st + (fast_st - base_st) * boost
+    st_speed = max(min_steering, thr_speed * str_ratio)  # Ensure minimum steering
 
     # Apply speed scaling
     thr *= thr_speed

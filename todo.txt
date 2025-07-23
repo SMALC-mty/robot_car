@@ -1,3 +1,5 @@
-- traction control / skew rate limiter
-- fine tune line follower
-- change driver pins to allow separate Enable PWM frequency control
+-- traction control / skew rate limiter
++ fine tune line follower
++ change driver pins to allow separate Enable PWM frequency control
+- change to analog input pins
+- test ultrasonic sensor by writing an obstacle avoidance routine

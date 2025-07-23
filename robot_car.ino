@@ -11,7 +11,7 @@ DiffCar car(
   9,  // ENB (Timer 1)
   8,  // IN3
   7,  // IN4
-  0.05f // Trim factor (default = 0.18f, adjust as needed)
+  -0.04f // Trim factor
 );
 
 // --- SENSOR PIN DEFINITIONS ---
@@ -169,8 +169,8 @@ void dance() {
 void followLine() {
   // Constant settings
   const unsigned long LOST_TIMEOUT_MS = 500;  // timeout for permanent line loss
-  const float BASE_THROTTLE = 0.6;
-  const float BASE_STEERING = 0.3;
+  const float BASE_THROTTLE = 0.45;
+  const float BASE_STEERING = 0.15;
   const float ALIGN_THRESHOLD = 0.0;  // Below this, robot will reverse
 
   // Static variables for error-based line following state
@@ -184,7 +184,7 @@ void followLine() {
   // Determine error based on sensor states
   float error = 0.0;
   if (leftSensor || rightSensor) { // Check if at least one sensor is on the line
-    lastDirection = -leftSensor + rightSensor;  // Remember this direction
+    lastDirection = leftSensor - rightSensor;  // Remember this direction (swapped)
     error = lastDirection * 0.5; // Scale error to -0.5 to +0.5 range
     lineLastSeen = millis();      // Update timestamp when line is detected
   }
@@ -216,8 +216,8 @@ void followLine() {
 
 void wanderCage() {
   // Constant settings
-  const float THROTTLE = 1.0;
-  const float STEERING = 1.0;
+  const float THROTTLE = 0.3;
+  const float STEERING = 0.3;
   const unsigned long SPIN_TIME_MS = 600;
   
   // Static variables for cage wandering state
@@ -240,10 +240,10 @@ void wanderCage() {
       spinStartTime = millis();
       
       if (leftSensor && !rightSensor) {
-        spinDirection = 1;  // Left sensor hit - spin right (away from boundary)
+        spinDirection = -1;  // Left sensor hit - spin right (away from boundary) 
       } else {
         // Right sensor hit OR both sensors hit - spin left (away from boundary)
-        spinDirection = -1;
+        spinDirection = 1;
       }
       
       car.setThrottle(0.0);
