@@ -15,17 +15,20 @@ DiffCar car(
 );
 
 // --- SENSOR PIN DEFINITIONS ---
-const int leftSensorPin = 4;   // Left IR sensor
-const int rightSensorPin = 5;  // Right IR sensor
+const int leftSensorPin = A5;   // Left IR sensor (analog pin used as digital)
+const int rightSensorPin = A4;  // Right IR sensor (analog pin used as digital)
+const int trigPin = 4;          // Ultrasonic trigger pin
+const int echoPin = 5;          // Ultrasonic echo pin
 
 // --- MODE DEFINITIONS ---
-void (*modeFunctions[4])() = { nullptr, nullptr, nullptr, nullptr };
+void (*modeFunctions[5])() = { nullptr, nullptr, nullptr, nullptr, nullptr };
 
 const char* modeDescriptions[] = {
-  "Remote control",  // 'a' (index 0)
-  "Dance mode",      // 'b' (index 1)
-  "Line following",  // 'c' (index 2)
-  "Cage wandering"   // 'd' (index 3)
+  "Remote control",       // 'a' (index 0)
+  "Dance mode",           // 'b' (index 1)
+  "Line following",       // 'c' (index 2)
+  "Cage wandering",       // 'd' (index 3)
+  "Collision avoidance"   // 'e' (index 4)
 };
 
 const int NUM_MODES = sizeof(modeFunctions) / sizeof(modeFunctions[0]);
@@ -51,22 +54,29 @@ void setup() {
   pinMode(leftSensorPin, INPUT);
   pinMode(rightSensorPin, INPUT);
   
-  // Initialize mode functions after all functions are defined
-  modeFunctions[0] = updateCar;     // Remote control
-  modeFunctions[1] = dance;         // Dance mode
-  modeFunctions[2] = followLine;    // Line following
-  modeFunctions[3] = wanderCage;    // Cage wandering
+  // Setup ultrasonic sensor pins
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
   
+  // Initialize mode functions after all functions are defined
+  modeFunctions[0] = updateCar;        // Remote control
+  modeFunctions[1] = dance;            // Dance mode
+  modeFunctions[2] = followLine;       // Line following
+  modeFunctions[3] = wanderCage;       // Cage wandering
+  modeFunctions[4] = collisionAvoidance;   // Manual + Ultrasonic
+
   println("Robot car ready. PWM freq 31Hz. Send 'F' for forward, 'S' for stop, '0'-'9' for speed.");
 }
 
 void loop() {
-  // Always process incoming commands
-  receiveChar();
-  receiveModeSwitch();  // Check for mode changes first
-  receiveDirection();
-  receiveSpeed();
-  receiveTrimAdjust();  // Check for trim adjustments
+  // Process ALL incoming commands until buffer is empty
+  while (available()) {
+    receiveChar();
+    receiveModeSwitch();  // Check for mode changes first
+    receiveDirection();
+    receiveSpeed();
+    receiveTrimAdjust();  // Check for trim adjustments
+  }
   
   // Execute current mode behavior
   if (currentMode >= 0 && currentMode < NUM_MODES) {
@@ -151,107 +161,14 @@ void receiveTrimAdjust() {
   }
 }
 
+void getUserVels(float &outThrottle, float &outSteering) {
+  outThrottle = throttle * speed;
+  outSteering = steering * steerSpeed;
+}
+
 void updateCar() {
-  float finalThrottle = throttle * speed;                // Combine direction and magnitude
-  float finalSteering = steering * steerSpeed;           // Combine steering direction and steering speed
-  
+  float finalThrottle, finalSteering;
+  getUserVels(finalThrottle, finalSteering);
   car.setThrottle(finalThrottle);
   car.setSteering(finalSteering);
-}
-
-void dance() {
-  car.setSteering(0.5f);  // left
-  delay(500);
-  car.setSteering(-0.5f); // right
-  delay(500);
-}
-
-void followLine() {
-  // Constant settings
-  const unsigned long LOST_TIMEOUT_MS = 500;  // timeout for permanent line loss
-  const float BASE_THROTTLE = 0.45;
-  const float BASE_STEERING = 0.15;
-  const float ALIGN_THRESHOLD = 0.0;  // Below this, robot will reverse
-
-  // Static variables for error-based line following state
-  static unsigned long lineLastSeen = 0;        // timestamp when line was last detected
-  static float lastDirection = 0.0;         // remember last correction direction
-  
-  // Read sensor states (HIGH = black line, LOW = white background)
-  int leftSensor = digitalRead(leftSensorPin);   // 0 or 1
-  int rightSensor = digitalRead(rightSensorPin); // 0 or 1
-  
-  // Determine error based on sensor states
-  float error = 0.0;
-  if (leftSensor || rightSensor) { // Check if at least one sensor is on the line
-    lastDirection = leftSensor - rightSensor;  // Remember this direction (swapped)
-    error = lastDirection * 0.5; // Scale error to -0.5 to +0.5 range
-    lineLastSeen = millis();      // Update timestamp when line is detected
-  }
-  else { // Both sensors off line - handle line loss case
-    error = lastDirection; // Use last known direction
-  }
-  
-  // Initialize motor commands
-  float throttle = 0.0;
-  float steering = 0.0;
-  
-  // Check if timeout has been exceeded
-  if (millis() - lineLastSeen <= LOST_TIMEOUT_MS) {
-    // Determine alignment (1 - absolute value of error)
-    float alignment = 1.0 - abs(error);
-    
-    // Calculate throttle factor using alignment threshold
-    float throttle_factor = (alignment - ALIGN_THRESHOLD) / (1.0 - ALIGN_THRESHOLD);
-    
-    // Calculate throttle and steering based on alignment and error
-    throttle = BASE_THROTTLE * throttle_factor;  // Can go negative for reverse
-    steering = BASE_STEERING * error;            // Steer proportionally to error
-  }
-  
-  // Apply motor commands
-  car.setThrottle(throttle);
-  car.setSteering(steering);
-}
-
-void wanderCage() {
-  // Constant settings
-  const float THROTTLE = 0.3;
-  const float STEERING = 0.3;
-  const unsigned long SPIN_TIME_MS = 600;
-  
-  // Static variables for cage wandering state
-  static unsigned long spinStartTime = 0;
-  static int spinDirection = 0;  // -1 = right, +1 = left
-  
-  // Check if we're still within spin timeout
-  if (millis() - spinStartTime < SPIN_TIME_MS) {
-    // Continue spinning in the chosen direction
-    car.setThrottle(0.0);
-    car.setSteering(STEERING * spinDirection);
-  } else {
-    // Not spinning - read sensors and check for boundaries
-    bool leftSensor = digitalRead(leftSensorPin);
-    bool rightSensor = digitalRead(rightSensorPin);
-    
-    // Check if we hit a boundary
-    if (leftSensor || rightSensor) {
-      // Hit boundary - start spinning away from it
-      spinStartTime = millis();
-      
-      if (leftSensor && !rightSensor) {
-        spinDirection = -1;  // Left sensor hit - spin right (away from boundary) 
-      } else {
-        // Right sensor hit OR both sensors hit - spin left (away from boundary)
-        spinDirection = 1;
-      }
-      
-      car.setThrottle(0.0);
-      car.setSteering(STEERING * spinDirection);
-    } else {
-      // No boundary detected - go straight ahead
-      car.setThrottle(THROTTLE);
-      car.setSteering(0.0);
-    }
-  }
 }

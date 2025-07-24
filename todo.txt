@@ -1,5 +1,11 @@
 -- traction control / skew rate limiter
 + fine tune line follower
 + change driver pins to allow separate Enable PWM frequency control
-- change to analog input pins
-- test ultrasonic sensor by writing an obstacle avoidance routine
++ change to analog input pins
++ explain what happened
++ separate into another tab
++ fix potential serial issue when blocking functions are used, should instead exhaust the serial buffer before proceeding with the mode function
++ create dedicated getUserVels() to be called in functions such as updateCar()
+- Test ultrasonic sensor by writing an obstacle avoidance routine. Using getUserVels(), allow the ultrasonic sensor to contribute to the user vels instead of overwriting them.
+-- Add minimal telemetry to existing modes using println
+-- figure out issue where getDistance screws up manual control below the limit

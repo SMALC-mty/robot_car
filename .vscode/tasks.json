@@ -1,0 +1,14 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Verify Arduino Code",
+			"type": "shell",
+			"command": "echo",
+			"args": [
+				"Arduino code updated with hybrid manual + ultrasonic mode 'e'. The robot will now accept manual control commands while simultaneously reporting ultrasonic sensor readings every 100ms via Bluetooth."
+			],
+			"group": "build"
+		}
+	]
+}

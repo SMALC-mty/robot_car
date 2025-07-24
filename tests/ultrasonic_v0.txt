@@ -1,0 +1,62 @@
+/*
+ * Ultrasonic Sensor Test Sketch
+ * Tests HC-SR04 ultrasonic sensor on pins 4 (trig) and 5 (echo)
+ * Displays distance measurements in Serial Monitor
+ */
+
+// --- PIN DEFINITIONS ---
+const int trigPin = 4;   // Trigger pin
+const int echoPin = 5;   // Echo pin
+
+void setup() {
+  Serial.begin(9600);
+  
+  // Configure ultrasonic sensor pins
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+  
+  Serial.println("Ultrasonic Sensor Test");
+  Serial.println("Pins: Trig=4, Echo=5");
+  Serial.println("Distance readings every 500ms:");
+  Serial.println("---");
+}
+
+void loop() {
+  // Measure distance
+  float distance = getDistance();
+  
+  // Display results
+  Serial.print("Distance: ");
+  if (distance > 0) {
+    Serial.print(distance);
+    Serial.println(" cm");
+  } else {
+    Serial.println("Out of range");
+  }
+  
+  // Wait before next reading
+  delay(500);
+}
+
+float getDistance() {
+  // Clear the trigger pin
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+  
+  // Send 10us pulse to trigger pin
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+  
+  // Read the echo pin (pulse duration in microseconds)
+  long duration = pulseIn(echoPin, HIGH, 30000); // 30ms timeout
+  
+  // Calculate distance in cm (speed of sound = 343 m/s)
+  // Distance = (duration * 0.0343) / 2
+  if (duration > 0) {
+    float distance = (duration * 0.0343) / 2;
+    return distance;
+  } else {
+    return -1; // Out of range or no echo
+  }
+}
