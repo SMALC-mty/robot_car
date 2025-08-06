@@ -166,3 +166,126 @@ void collisionAvoidance() {
     car.setThrottle(userThrottle);
     car.setSteering(userSteering);
 }
+
+void targetLock() {
+    // Target lock mode: spin to find target, then backtrack
+    const float SEARCH_SPEED = 0.2;        // Rotation speed while searching
+    const int TARGET_DISTANCE = 30;        // cm - detection range for targets
+    const float BACKTRACK_SPEED = -0.15;   // Opposite rotation speed for backtrack
+    const unsigned long BACKTRACK_TIME = 100; // ms - how long to backtrack
+    
+    // Static variables for state machine
+    static bool targetFound = false;
+    static unsigned long backtrackStartTime = 0;
+    
+    // Get current distance (non-blocking, always fresh!)
+    float distance = nbPulseIn();
+    
+    // State machine logic
+    if (!targetFound) {
+        // SEARCHING STATE
+        String distanceMsg = "Scanning: " + String(distance, 1) + " cm";
+        sendTelem(distanceMsg.c_str());
+        
+        if (distance > 0 && distance < TARGET_DISTANCE) {
+            // Target detected - switch to backtrack state
+            targetFound = true;
+            backtrackStartTime = millis();
+            
+            String lockMsg = "TARGET FOUND! Starting backtrack...";
+            sendTelem(lockMsg.c_str());
+        } else {
+            // No target - continue searching
+            car.setThrottle(0.0);
+            car.setSteering(SEARCH_SPEED);  // Spin right to search
+        }
+    } else {
+        // BACKTRACKING STATE
+        if (millis() - backtrackStartTime < BACKTRACK_TIME) {
+            // Still backtracking
+            car.setThrottle(0.0);
+            car.setSteering(BACKTRACK_SPEED);  // Spin opposite direction
+            
+            String backMsg = "Backtracking... " + String(BACKTRACK_TIME - (millis() - backtrackStartTime)) + " ms left";
+            sendTelem(backMsg.c_str());
+        } else {
+            // Backtrack complete - check if target is still in range
+            if (distance > 0 && distance < TARGET_DISTANCE) {
+                // Target still in range - maintain lock
+                car.setThrottle(0.0);
+                car.setSteering(0.0);
+                
+                String finalMsg = "TARGET LOCKED at " + String(distance, 1) + " cm!";
+                sendTelem(finalMsg.c_str());
+            } else {
+                // Target lost or out of range - resume searching
+                targetFound = false;  // Reset state to start searching again
+                
+                String lostMsg = "Target lost (" + String(distance, 1) + " cm) - resuming search...";
+                sendTelem(lostMsg.c_str());
+            }
+        }
+    }
+}
+
+void headbutt() {
+    // Headbutt mode: spin to find target, then stabilize and ram it!
+    const float SEARCH_SPEED = 0.2;        // Rotation speed while searching
+    const float ATTACK_SPEED = 0.6;        // Forward speed when charging
+    const int TARGET_DISTANCE = 30;        // cm - detection range for targets
+    const float CORRECTION_SPIN = 0.0;     // Spin speed during correction (0 = just wait)
+    const unsigned long CORRECTION_TIME = 2000; // ms - stabilization time before ramming
+    
+    // Static variables for state machine
+    static bool targetFound = false;
+    static unsigned long correctionStartTime = 0;
+    
+    // Get current distance (non-blocking, always fresh!)
+    float distance = nbPulseIn();
+    
+    // State machine logic
+    if (!targetFound) {
+        // SEARCHING STATE
+        String searchMsg = "Searching for target: " + String(distance, 1) + " cm";
+        sendTelem(searchMsg.c_str());
+        
+        if (distance > 0 && distance < TARGET_DISTANCE) {
+            // Target detected - switch to correction state
+            targetFound = true;
+            correctionStartTime = millis();
+            
+            String foundMsg = "TARGET FOUND! Stabilizing for attack...";
+            sendTelem(foundMsg.c_str());
+        } else {
+            // No target - continue searching
+            car.setThrottle(0.0);
+            car.setSteering(SEARCH_SPEED);  // Spin right to search
+        }
+    } else {
+        // CORRECTION STATE
+        if (millis() - correctionStartTime < CORRECTION_TIME && distance > 0 && distance < TARGET_DISTANCE) {
+            // Still correcting/stabilizing AND target still in range
+            car.setThrottle(0.0);
+            car.setSteering(CORRECTION_SPIN);  // Usually 0 for stabilization
+            
+            String corrMsg = "Stabilizing... " + String(CORRECTION_TIME - (millis() - correctionStartTime)) + " ms left";
+            sendTelem(corrMsg.c_str());
+        } else {
+            // Correction complete OR target moved - check final target status
+            if (distance > 0 && distance < TARGET_DISTANCE) {
+                // Target still in range - CHARGE!!!
+                car.setThrottle(ATTACK_SPEED);
+                car.setSteering(0.0);  // Go straight
+                
+                String attackMsg = "CHARGING TARGET at " + String(distance, 1) + " cm!";
+                sendTelem(attackMsg.c_str());
+            } else {
+                // Target lost or out of range - resume searching
+                targetFound = false;  // Reset state to start searching again
+                
+                String lostMsg = "Target lost (" + String(distance, 1) + " cm) - resuming search...";
+                sendTelem(lostMsg.c_str());
+            }
+        }
+    }
+}

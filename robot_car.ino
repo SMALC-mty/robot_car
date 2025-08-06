@@ -21,14 +21,16 @@ const int trigPin = 2;  // Trigger pin - can be any digital pin
 const int echoPin = 3;  // Echo pin - MUST be pin 2 or 3 for interrupts!
 
 // --- MODE DEFINITIONS ---
-void (*modeFunctions[5])() = { nullptr, nullptr, nullptr, nullptr, nullptr };
+void (*modeFunctions[7])() = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
 const char* modeDescriptions[] = {
   "Remote control",         // 'a' (index 0)
   "Dance mode",             // 'b' (index 1)
   "Line following",         // 'c' (index 2)
   "Cage wandering",         // 'd' (index 3)
-  "Collision avoidance"     // 'e' (index 4) - NON-BLOCKING!
+  "Collision avoidance",    // 'e' (index 4)
+  "Target lock",            // 'f' (index 5) - SPIN TO FIND TARGET!
+  "Headbutt"                // 'g' (index 6) - RAM THE TARGET!
 };
 
 const int NUM_MODES = sizeof(modeFunctions) / sizeof(modeFunctions[0]);
@@ -63,6 +65,8 @@ void setup() {
   modeFunctions[2] = followLine;       // Line following
   modeFunctions[3] = wanderCage;       // Cage wandering
   modeFunctions[4] = collisionAvoidance; // Manual + Ultrasonic (NON-BLOCKING!)
+  modeFunctions[5] = targetLock;       // Target lock mode
+  modeFunctions[6] = headbutt;         // Headbutt mode - RAM THE TARGET!
 
   println("Robot car ready. PWM freq 31Hz. Send 'F' for forward, 'S' for stop, '0'-'9' for speed.");
 }
