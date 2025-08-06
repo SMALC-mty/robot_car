@@ -3,7 +3,7 @@
 #include "DiffCar.h"
 
 // --- PIN DEFINITIONS ---
-SoftwareSerial BTSerial(2, 3); // RX, TX
+SoftwareSerial BTSerial(A4, A5); // RX=A4, TX=A5 (using numeric pin numbers)
 DiffCar car(
   11, // ENA (Timer 2)
   12, // IN1
@@ -15,20 +15,20 @@ DiffCar car(
 );
 
 // --- SENSOR PIN DEFINITIONS ---
-const int leftSensorPin = A5;   // Left IR sensor (analog pin used as digital)
-const int rightSensorPin = A4;  // Right IR sensor (analog pin used as digital)
-const int trigPin = 4;          // Ultrasonic trigger pin
-const int echoPin = 5;          // Ultrasonic echo pin
+const int leftSensorPin = A3;   // Left IR sensor (analog pin used as digital)
+const int rightSensorPin = A2;  // Right IR sensor (analog pin used as digital)
+const int trigPin = 2;  // Trigger pin - can be any digital pin
+const int echoPin = 3;  // Echo pin - MUST be pin 2 or 3 for interrupts!
 
 // --- MODE DEFINITIONS ---
 void (*modeFunctions[5])() = { nullptr, nullptr, nullptr, nullptr, nullptr };
 
 const char* modeDescriptions[] = {
-  "Remote control",       // 'a' (index 0)
-  "Dance mode",           // 'b' (index 1)
-  "Line following",       // 'c' (index 2)
-  "Cage wandering",       // 'd' (index 3)
-  "Collision avoidance"   // 'e' (index 4)
+  "Remote control",         // 'a' (index 0)
+  "Dance mode",             // 'b' (index 1)
+  "Line following",         // 'c' (index 2)
+  "Cage wandering",         // 'd' (index 3)
+  "Collision avoidance"     // 'e' (index 4) - NON-BLOCKING!
 };
 
 const int NUM_MODES = sizeof(modeFunctions) / sizeof(modeFunctions[0]);
@@ -54,16 +54,15 @@ void setup() {
   pinMode(leftSensorPin, INPUT);
   pinMode(rightSensorPin, INPUT);
   
-  // Setup ultrasonic sensor pins
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
+  // Setup ultrasonic sensor (from ultrasonic_nb.ino tab)
+  setupUltrasonic();
   
   // Initialize mode functions after all functions are defined
   modeFunctions[0] = updateCar;        // Remote control
   modeFunctions[1] = dance;            // Dance mode
   modeFunctions[2] = followLine;       // Line following
   modeFunctions[3] = wanderCage;       // Cage wandering
-  modeFunctions[4] = collisionAvoidance;   // Manual + Ultrasonic
+  modeFunctions[4] = collisionAvoidance; // Manual + Ultrasonic (NON-BLOCKING!)
 
   println("Robot car ready. PWM freq 31Hz. Send 'F' for forward, 'S' for stop, '0'-'9' for speed.");
 }
@@ -171,4 +170,14 @@ void updateCar() {
   getUserVels(finalThrottle, finalSteering);
   car.setThrottle(finalThrottle);
   car.setSteering(finalSteering);
+}
+
+void sendTelem(const char* message) {
+  static unsigned long lastTelemSent = 0;
+  const unsigned long TELEM_INTERVAL = 1000;  // Send telemetry every 500ms max
+  
+  if (millis() - lastTelemSent >= TELEM_INTERVAL) {
+    lastTelemSent = millis();
+    println(message);
+  }
 }

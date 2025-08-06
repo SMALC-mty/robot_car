@@ -6,6 +6,9 @@
 + separate into another tab
 + fix potential serial issue when blocking functions are used, should instead exhaust the serial buffer before proceeding with the mode function
 + create dedicated getUserVels() to be called in functions such as updateCar()
-- Test ultrasonic sensor by writing an obstacle avoidance routine. Using getUserVels(), allow the ultrasonic sensor to contribute to the user vels instead of overwriting them.
++ Test ultrasonic sensor by writing an obstacle avoidance routine. Using getUserVels(), allow the ultrasonic sensor to contribute to the user vels instead of overwriting them.
++ improve obstacle avoidance by setting up a PID to reverse when past the threshold
++ re-map pins to allow ultrasonic interrupts. Perhaps HC-05 can be moved to SCL+SDA?
+- set up target lock mode (spin until object is detected)
 -- Add minimal telemetry to existing modes using println
 -- figure out issue where getDistance screws up manual control below the limit

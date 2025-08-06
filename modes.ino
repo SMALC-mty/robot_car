@@ -125,48 +125,44 @@ void wanderCage() {
 }
 
 void collisionAvoidance() {
-    // Constant settings
-    const unsigned long sensorInterval = 200;
-    const int SAFETY_DISTANCE = 40;    // cm
+    // Non-blocking collision avoidance using interrupt-based ultrasonic
+    const int MAX_DISTANCE = 40;      // cm - no interference at this distance
+    const float REDUCTION_RATE = 0.05; // throttle reduction per cm closer
+    const float MIN_THROTTLE = -0.25;   // minimum throttle (max reverse speed)
 
     // Get user's intended velocities
     float userThrottle, userSteering;
     getUserVels(userThrottle, userSteering);
     
-    static unsigned long lastSensorRead = 0;
-    static long lastDistance = 0;    // Cache last reading to avoid blocking every loop
-    static bool wasBlocked = false;  // Track blocking state to avoid spam
+    // Get current distance (non-blocking, always fresh!)
+    float distance = nbPulseIn();
     
-    // Read sensor periodically
-    if (millis() - lastSensorRead >= sensorInterval) {
-        lastSensorRead = millis();
-        lastDistance = getDistance(50);
+    // Send telemetry (sendTelem already has built-in rate limiting)
+    String distanceMsg = "D: " + String(distance, 1) + " cm";
+    sendTelem(distanceMsg.c_str());
+    
+    // Apply proportional obstacle avoidance
+    if (distance > 0 && distance < MAX_DISTANCE) {
+        // Calculate throttle reduction based on distance
+        float distanceFromMax = MAX_DISTANCE - distance;
+        float throttleReduction = distanceFromMax * REDUCTION_RATE;
         
-        // Send telemetry only every few readings to avoid overwhelming HC-05
-        static int telemetryCounter = 0;
-        if (++telemetryCounter >= 5) {  // Every 5th reading = every 1 second
-            telemetryCounter = 0;
-            print("D: ");
-            print(lastDistance);
-            println(" cm");
-        }
+        // Apply reduction to user throttle
+        float modifiedThrottle = userThrottle - throttleReduction;
+        
+        // Cap throttle to minimum value (prevent excessive reverse)
+        modifiedThrottle = max(modifiedThrottle, MIN_THROTTLE);
+        
+        // Send telemetry about the modification
+        String modMsg = "Throttle: " + String(userThrottle, 2) + " -> " + 
+                       String(modifiedThrottle, 2) + " (reduced " + 
+                       String(throttleReduction, 2) + ")";
+        sendTelem(modMsg.c_str());
+        
+        userThrottle = modifiedThrottle;
     }
     
-    // Apply obstacle avoidance: cap forward throttle when too close
-    bool isBlocked = (lastDistance > 0 && lastDistance < SAFETY_DISTANCE);
-    if (isBlocked) {
-        userThrottle = min(userThrottle, 0.0);  // Cap throttle to 0 or below
-        
-        // Only print blocking message when first blocked (not every loop)
-        if (!wasBlocked) {
-            print("BLOCKED - too close: ");
-            print(lastDistance);
-            println(" cm");
-        }
-    }
-    wasBlocked = isBlocked;  // Remember state for next loop
-    
-    // Apply modified commands
+    // Apply commands (steering unaffected for evasive maneuvers)
     car.setThrottle(userThrottle);
     car.setSteering(userSteering);
 }
