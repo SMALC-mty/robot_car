@@ -21,7 +21,7 @@ const int trigPin = 2;  // Trigger pin - can be any digital pin
 const int echoPin = 3;  // Echo pin - MUST be pin 2 or 3 for interrupts!
 
 // --- MODE DEFINITIONS ---
-void (*modeFunctions[7])() = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
+void (*modeFunctions[8])() = { nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr };
 
 const char* modeDescriptions[] = {
   "Remote control",         // 'a' (index 0)
@@ -30,7 +30,8 @@ const char* modeDescriptions[] = {
   "Cage wandering",         // 'd' (index 3)
   "Collision avoidance",    // 'e' (index 4)
   "Target lock",            // 'f' (index 5) - SPIN TO FIND TARGET!
-  "Headbutt"                // 'g' (index 6) - RAM THE TARGET!
+  "Headbutt",               // 'g' (index 6) - RAM THE TARGET!
+  "Sumo"                    // 'h' (index 7) - BOUNDARY-AWARE RAMMING!
 };
 
 const int NUM_MODES = sizeof(modeFunctions) / sizeof(modeFunctions[0]);
@@ -67,6 +68,7 @@ void setup() {
   modeFunctions[4] = collisionAvoidance; // Manual + Ultrasonic (NON-BLOCKING!)
   modeFunctions[5] = targetLock;       // Target lock mode
   modeFunctions[6] = headbutt;         // Headbutt mode - RAM THE TARGET!
+  modeFunctions[7] = sumo;             // Sumo mode - BOUNDARY-AWARE RAMMING!
 
   println("Robot car ready. PWM freq 31Hz. Send 'F' for forward, 'S' for stop, '0'-'9' for speed.");
 }
@@ -176,12 +178,40 @@ void updateCar() {
   car.setSteering(finalSteering);
 }
 
+// HELPERS
 void sendTelem(const char* message) {
   static unsigned long lastTelemSent = 0;
-  const unsigned long TELEM_INTERVAL = 1000;  // Send telemetry every 500ms max
+  const unsigned long TELEM_INTERVAL = 500;  // Send telemetry every 500ms max
   
   if (millis() - lastTelemSent >= TELEM_INTERVAL) {
     lastTelemSent = millis();
     println(message);
   }
+}
+
+long getDistance(int maxDistanceCm = 400) {
+    // Convert max distance to timeout (microseconds)
+    // Sound travels ~343 m/s, round trip = distance * 2
+    // Time = (distance_cm * 0.01 * 2) / 343 * 1000000 microseconds
+    // Simplified: timeout = distance_cm * 58.3
+    unsigned long timeoutUs = maxDistanceCm * 58;
+    
+    // Clear the trigger pin
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
+    
+    // Trigger the sensor
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+    
+    // Read the echo pin with calculated timeout
+    long duration = pulseIn(echoPin, HIGH, timeoutUs);
+    
+    // Calculate distance (sound travels at ~343 m/s)
+    // Duration is round-trip time, so divide by 2
+    // Distance = (duration * 0.0343) / 2
+    long distance = duration * 0.01715; // Simplified: 0.0343/2 = 0.01715
+    
+    return distance;
 }
