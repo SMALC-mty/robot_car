@@ -76,7 +76,7 @@ def trim_input():
     return None
 
 # Main control loop
-with RobotCar(on_message=lambda msg: print(msg)) as car:
+with RobotCar(port="COM7", on_message=lambda msg: print(msg)) as car:
     try:
         while True:
             # Check for mode input
