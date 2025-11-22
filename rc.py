@@ -15,7 +15,7 @@ def ctrl_input():
     
     # Throttle scaling and steering ratio
     base_thr = ctrl_input.base_thr
-    fast_thr = 1.0
+    fast_thr = 0.7
     str_ratio = 0.8  # Steering speed as ratio of throttle speed
     min_steering = 0.1  # Minimum steering speed to overcome static friction
 

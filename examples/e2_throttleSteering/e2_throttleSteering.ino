@@ -4,19 +4,19 @@ void setup() {
   
   delay(2000);
   
-  setCar(0.3, 0); // Forward
+  setCar(0.4, 0); // Forward
   delay(500);
 
   setCar(0, 0);   // Stop
   delay(500);
 
-  setCar(-0.3, 0);// Back
+  setCar(-0.4, 0);// Back
   delay(500);
 
   setCar(0, 0);   // Stop
   delay(500);
 
-  setCar(0, 0.3); // Right
+  setCar(0, 0.4); // Right
   delay(500);
 
   setCar(0, 0);   // Stop

@@ -42,7 +42,7 @@ int steering = 0;        // Steering: -1 (right), 0 (straight), 1 (left)
 float speed = 0.5;       // Speed multiplier: 0.0 to 1.0
 float steerSpeed = 0.5;  // Steering speed multiplier: 0.0 to 1.0
 char receivedChar = 0;   // Current received character (0 = null/none)
-int currentMode = 0;     // Current mode index: 0 = remote control, 1 = dance, etc.
+int currentMode = 2;     // Current mode index: 0 = remote control, 1 = dance, etc.
 float trim_factor = 0.3f; // Trim adjustment factor
 
 void setup() {
